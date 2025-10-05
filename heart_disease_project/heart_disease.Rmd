@@ -1,0 +1,1092 @@
+---
+title: "Heart disease"
+author: "Ainhoa López"
+date: "2023-11-27"
+output: pdf_document
+---
+```{r}
+#library
+library(ggplot2)
+library(car)
+library(corrplot)
+library(lme4)
+library(broom)
+```
+
+```{r}
+heart_data <- read.csv("heart_failure_clinical_records_dataset.csv")
+sapply(heart_data, class)
+```
+
+```{r}
+table(heart_data$DEATH_EVENT)
+```
+
+```{r}
+round(prop.table(table(heart_data$DEATH_EVENT))*100, digits = 2)
+```
+
+```{r}
+# Death Event
+ggplot(heart_data, aes(x = as.factor(DEATH_EVENT), fill = as.factor(DEATH_EVENT))) +
+  geom_bar() +
+  xlab("Heart Disease") +
+  ylab("Count") +
+  ggtitle("Death events") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Survive", "Death"))
+
+```
+
+```{r}
+# Age
+ggplot(heart_data, aes(x = age, fill = as.factor(DEATH_EVENT))) +
+  geom_bar() +
+  xlab("Age") +
+  ylab("Count") +
+  ggtitle("Heart Disease Female vs Male") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Survive", "Death"))
+```
+
+```{r}
+age <- "age"
+
+formula_age <- as.formula(paste("DEATH_EVENT ~", age))
+
+# Age model
+age_model <- glm(formula_age, data = heart_data, family = "binomial")
+
+# Check significance
+age_summary <- summary(age_model)
+age_summary
+# Extract p-value
+age_p_value <- age_summary$coefficients[, "Pr(>|z|)"][2]
+age_p_value
+
+```
+
+```{r}
+# Double-check if age is a significant predictor by computing CI
+age_coefficient <- coef(age_model)
+age_coefficient
+# Get confidence intervals for coefficients
+age_conf_intervals <- confint(age_model)
+age_conf_intervals
+
+
+```
+
+```{r}
+likelihood_age <- function(parameters, data) {
+  log_odds_age <- parameters[1] + parameters[2] * data$age
+  probabilities <- 1 / (1 + exp(-log_odds_age))
+  log_likelihood_age <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_age)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_age, data = heart_data)
+
+mle_age_parameters <- result$par
+cat("MLE Parameters:", mle_age_parameters, "\n")
+
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+age_values <- seq(min(heart_data$age), max(heart_data$age), length.out = 50)
+log_odds <- age_coefficient * age_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$age, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "Age", ylab = "Death Event", main = "Logistic Regression Curve for Age")
+lines(age_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Anemia 
+ggplot(heart_data, aes(x = as.factor(anaemia), fill = as.factor(DEATH_EVENT))) +
+  geom_bar() +
+  xlab("Anemia levels") +
+  ylab("Count") +
+  ggtitle("Levels of Anemia and Heart Disease") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Survive", "Death"))
+
+```
+
+```{r}
+anemia <- "anaemia"
+
+formula_anemia <- as.formula(paste("DEATH_EVENT ~", anemia))
+
+# Anemia model
+anemia_model <- glm(formula_anemia, data = heart_data, family = "binomial")
+
+# Check significance
+anemia_summary <- summary(anemia_model)
+anemia_summary
+
+# Extract p-value
+anemia_p_value <- anemia_summary$coefficients[, "Pr(>|z|)"][2]
+anemia_p_value
+
+```
+
+```{r}
+# Double-check if anemia is a significant predictor by computing CI
+anemia_coefficient <- coef(anemia_model)
+anemia_coefficient
+# Get confidence intervals for coefficients
+anemia_conf_intervals <- confint(anemia_model)
+anemia_conf_intervals
+
+```
+
+```{r}
+#anemia 
+likelihood_anemia <- function(parameters, data) {
+  log_odds_anemia <- parameters[1] + parameters[2] * data$anaemia
+  probabilities <- 1 / (1 + exp(-log_odds_anemia))
+  log_likelihood_anemia <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_anemia)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_anemia, data = heart_data)
+
+mle_anemia_parameters <- result$par
+cat("MLE Parameters:", mle_anemia_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+anemia_values <- seq(min(heart_data$anaemia), max(heart_data$anaemia), length.out = 50)
+log_odds <- anemia_coefficient * anemia_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$anaemia, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "Anemia", ylab = "Death Event", main = "Logistic Regression Curve for Anemia")
+lines(anemia_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Creatinine Phosphokinase
+ggplot(heart_data, aes(x =creatinine_phosphokinase, fill = as.factor(DEATH_EVENT))) +
+  geom_histogram(position = "dodge", bins = 30, color = "black", alpha = 0.7) +
+  xlab("Creatinine Phosphokinase") +
+  ylab("Count") +
+  ggtitle("Creatinine Phosphokinase vs. Death Event") +
+  scale_fill_discrete(name = "Death Event", labels = c("Survive", "Death")) 
+```
+
+```{r}
+creatinine_phosphokinase <- "creatinine_phosphokinase"
+
+formula_creatinine <- as.formula(paste("DEATH_EVENT ~", creatinine_phosphokinase))
+
+# Creatinine Phosphokinase model
+creatinine_model <- glm(formula_creatinine, data = heart_data, family = "binomial")
+
+# Check significance
+creatinine_summary <- summary(creatinine_model)
+creatinine_summary
+
+# Extract p-value
+creatinine_p_value <- creatinine_summary$coefficients[, "Pr(>|z|)"][2]
+creatinine_p_value
+```
+
+```{r}
+# Double-check if creatinine phosphokinase is a significant predictor by computing CI
+creatinine_coefficient <- coef(creatinine_model)
+creatinine_coefficient
+# Get confidence intervals for coefficients
+creatinine_conf_intervals <- confint(creatinine_model)
+creatinine_conf_intervals
+
+```
+
+```{r}
+likelihood_cp <- function(parameters, data) {
+  log_odds_cp <- parameters[1] + parameters[2] * data$creatinine_phosphokinase
+  probabilities <- 1 / (1 + exp(-log_odds_cp))
+  log_likelihood_cp <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_cp)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_cp, data = heart_data)
+
+mle_cp_parameters <- result$par
+cat("MLE Parameters:", mle_cp_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+creatinine_values <- seq(min(heart_data$creatinine), max(heart_data$creatinine), length.out = 50)
+log_odds <- creatinine_coefficient * creatinine_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$creatinine, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "creatinine", ylab = "Death Event", main = "Logistic Regression Curve for creatinine")
+lines(creatinine_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Diabetes
+ggplot(heart_data, aes(x = as.factor(diabetes), fill = as.factor(DEATH_EVENT))) +
+  geom_bar(position = "dodge", color = "black", alpha = 0.7) +
+  xlab("Diabetes") +
+  ylab("Count") +
+  ggtitle("Diabetes vs. Death Event") +
+  scale_fill_discrete(name = "Death Event", labels = c("Survive", "Death"))
+```
+
+```{r}
+diabetes <- "diabetes"
+
+formula_diabetes <- as.formula(paste("DEATH_EVENT ~", diabetes))
+
+# Diabetes model
+diabetes_model <- glm(formula_diabetes, data = heart_data, family = "binomial")
+
+# Check significance
+diabetes_summary <- summary(diabetes_model)
+diabetes_summary
+
+# Extract p-value
+diabetes_p_value <- diabetes_summary$coefficients[, "Pr(>|z|)"][2]
+diabetes_p_value
+```
+
+```{r}
+# Double-check if diabetes is a significant predictor by computing CI
+diabetes_coefficient <- coef(diabetes_model)
+diabetes_coefficient
+# Get confidence intervals for coefficients
+diabetes_conf_intervals <- confint(diabetes_model)
+diabetes_conf_intervals
+
+```
+
+```{r}
+likelihood_diabetes <- function(parameters, data) {
+  log_odds_diabetes <- parameters[1] + parameters[2] * data$diabetes
+  probabilities <- 1 / (1 + exp(-log_odds_diabetes))
+  log_likelihood_diabetes <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_diabetes)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_diabetes, data = heart_data)
+
+mle_diabetes_parameters <- result$par
+cat("MLE Parameters:", mle_diabetes_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+diabetes_values <- seq(min(heart_data$diabetes), max(heart_data$diabetes), length.out = 50)
+log_odds <- diabetes_coefficient * diabetes_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$diabetes, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "diabetes", ylab = "Death Event", main = "Logistic Regression Curve for diabetes")
+lines(diabetes_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Ejection fraction 
+ggplot(heart_data, aes(x = as.factor(DEATH_EVENT), y = ejection_fraction, fill = DEATH_EVENT)) +
+  geom_boxplot() +
+  xlab("Death Event") +
+  ylab("Ejection Fraction") +
+  ggtitle("Ejection Fraction vs. Death Event")
+```
+
+```{r}
+ejection_fraction <- "ejection_fraction"
+
+formula_ejection_fraction <- as.formula(paste("DEATH_EVENT ~", ejection_fraction))
+
+# Ejection fraction model
+ejection_fraction_model <- glm(formula_ejection_fraction, data = heart_data, family = "binomial")
+
+# Check significance
+ejection_fraction_summary <- summary(ejection_fraction_model)
+ejection_fraction_summary
+# Extract p-value
+ejection_fraction_p_value <- ejection_fraction_summary$coefficients[, "Pr(>|z|)"][2]
+ejection_fraction_p_value
+```
+
+```{r}
+# Double-check if ejection fraction is a significant predictor by computing CI
+ejection_fraction_coefficient <- coef(ejection_fraction_model)
+ejection_fraction_coefficient
+# Get confidence intervals for coefficients
+ejection_fraction_conf_intervals <- confint(ejection_fraction_model)
+ejection_fraction_conf_intervals
+
+```
+
+```{r}
+likelihood_ej <- function(parameters, data) {
+  log_odds_ej <- parameters[1] + parameters[2] * data$ejection_fraction
+  probabilities <- 1 / (1 + exp(-log_odds_ej))
+  log_likelihood_ej <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_ej)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_ej, data = heart_data)
+
+mle_ej_parameters <- result$par
+cat("MLE Parameters:", mle_ej_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+ejection_fraction_values <- seq(min(heart_data$ejection_fraction), max(heart_data$ejection_fraction), length.out = 50)
+log_odds <- ejection_fraction_coefficient * ejection_fraction_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$ejection_fraction, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "ejection_fraction", ylab = "Death Event", main = "Logistic Regression Curve for ejection_fraction")
+lines(ejection_fraction_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# High blood pressure
+ggplot(heart_data, aes(x = as.factor(high_blood_pressure), fill = as.factor(DEATH_EVENT))) +
+  geom_bar(position = "dodge", color = "black", alpha = 0.7) +
+  xlab("High Blood Pressure") +
+  ylab("Count") +
+  ggtitle("High Blood Pressure vs. Death Event") +
+  scale_fill_discrete(name = "Death Event", labels = c("Survive", "Death"))
+```
+
+```{r}
+hbp <- "high_blood_pressure"
+
+formula_hbp <- as.formula(paste("DEATH_EVENT ~", hbp))
+
+# High blood pressure model
+hbp_model <- glm(formula_hbp, data = heart_data, family = "binomial")
+
+# Check significance
+hbp_summary <- summary(hbp_model)
+hbp_summary
+# Extract p-value
+hbp_p_value <- hbp_summary$coefficients[, "Pr(>|z|)"][2]
+hbp_p_value
+```
+
+```{r}
+# Double-check if high blood pressure is a significant predictor by computing CI
+hbp_coefficient <- coef(hbp_model)
+hbp_coefficient
+# Get confidence intervals for coefficients
+hbp_conf_intervals <- confint(hbp_model)
+hbp_conf_intervals
+
+```
+
+```{r}
+likelihood_hbp <- function(parameters, data) {
+  log_odds_hbp <- parameters[1] + parameters[2] * data$high_blood_pressure
+  probabilities <- 1 / (1 + exp(-log_odds_hbp))
+  log_likelihood_hbp <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_hbp)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_hbp, data = heart_data)
+
+mle_hbp_parameters <- result$par
+cat("MLE Parameters:", mle_hbp_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+hbp_values <- seq(min(heart_data$high_blood_pressure), max(heart_data$high_blood_pressure), length.out = 50)
+log_odds <- hbp_coefficient * hbp_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$high_blood_pressure, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "hbp", ylab = "Death Event", main = "Logistic Regression Curve for High Blood Pressure")
+lines(hbp_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Platelets
+ggplot(heart_data, aes(x = as.factor(DEATH_EVENT), y = platelets, fill = DEATH_EVENT)) +
+  geom_boxplot() +
+  xlab("Death Event") +
+  ylab("Platelets") +
+  ggtitle("Platelets vs. Death Event")
+```
+
+```{r}
+platelets <- "platelets"
+
+formula_platelets <- as.formula(paste("DEATH_EVENT ~", platelets))
+
+# Platelets model
+platelets_model <- glm(formula_platelets, data = heart_data, family = "binomial")
+
+# Check significance
+platelets_summary <- summary(platelets_model)
+platelets_summary
+# Extract p-value
+platelets_p_value <- platelets_summary$coefficients[, "Pr(>|z|)"][2]
+platelets_p_value
+```
+
+```{r}
+# Double-check if platelets is a significant predictor by computing CI
+platelets_coefficient <- coef(platelets_model)
+platelets_coefficient
+# Get confidence intervals for coefficients
+platelets_conf_intervals <- confint(platelets_model)
+platelets_conf_intervals
+
+```
+
+```{r}
+likelihood_platelets <- function(parameters, data) {
+  log_odds_platelets <- parameters[1] + parameters[2] * data$platelets
+  probabilities <- 1 / (1 + exp(-log_odds_platelets))
+  log_likelihood_platelets <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_platelets)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_platelets, data = heart_data)
+
+mle_platelets_parameters <- result$par
+cat("MLE Parameters:", mle_platelets_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+platelets_values <- seq(min(heart_data$platelets), max(heart_data$platelets), length.out = 50)
+log_odds <- platelets_coefficient * platelets_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$platelets, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "Platelets", ylab = "Death Event", main = "Logistic Regression Curve for platelets")
+lines(platelets_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Serum creatinine
+ggplot(heart_data, aes(x = as.factor(DEATH_EVENT), y = serum_creatinine, fill = DEATH_EVENT)) +
+  geom_boxplot() +
+  xlab("Death Event") +
+  ylab("Serum Creatinine") +
+  ggtitle("Serum Creatinine vs. Death Event")
+```
+
+```{r}
+serum_creatinine <- "serum_creatinine"
+
+formula_serum_creatinine <- as.formula(paste("DEATH_EVENT ~", serum_creatinine))
+
+# Serum creatinine model
+serum_creatinine_model <- glm(formula_serum_creatinine, data = heart_data, family = "binomial")
+
+# Check significance
+serum_creatinine_summary <- summary(serum_creatinine_model)
+serum_creatinine_summary
+# Extract p-value
+serum_creatinine_p_value <- serum_creatinine_summary$coefficients[, "Pr(>|z|)"][2]
+serum_creatinine_p_value
+```
+
+```{r}
+# Double-check if serum creatinine is a significant predictor by computing CI
+serum_creatinine_coefficient <- coef(serum_creatinine_model)
+serum_creatinine_coefficient
+# Get confidence intervals for coefficients
+serum_creatinine_conf_intervals <- confint(serum_creatinine_model)
+serum_creatinine_conf_intervals
+
+```
+
+```{r}
+likelihood_sc <- function(parameters, data) {
+  log_odds_sc <- parameters[1] + parameters[2] * data$serum_creatinine
+  probabilities <- 1 / (1 + exp(-log_odds_sc))
+  log_likelihood_sc <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_sc)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_sc, data = heart_data)
+
+mle_sc_parameters <- result$par
+cat("MLE Parameters:", mle_sc_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+serum_creatinine_values <- seq(min(heart_data$serum_creatinine), max(heart_data$serum_creatinine), length.out = 50)
+log_odds <- serum_creatinine_coefficient * serum_creatinine_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$serum_creatinine, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "serum_creatinine", ylab = "Death Event", main = "Logistic Regression Curve for serum_creatinine")
+lines(serum_creatinine_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Serum sodium 
+ggplot(heart_data, aes(x = as.factor(DEATH_EVENT), y = serum_sodium, fill = DEATH_EVENT)) +
+  geom_boxplot() +
+  xlab("Death Event") +
+  ylab("Serum sodium") +
+  ggtitle("Serum Creatinine vs. Death Event")
+```
+
+```{r}
+serum_sodium <- "serum_sodium"
+
+formula_serum_sodium <- as.formula(paste("DEATH_EVENT ~", serum_sodium))
+
+# Serum sodium model
+serum_sodium_model <- glm(formula_serum_sodium, data = heart_data, family = "binomial")
+
+# Check significance
+serum_sodium_summary <- summary(serum_sodium_model)
+serum_sodium_summary
+# Extract p-value
+serum_sodium_p_value <- serum_sodium_summary$coefficients[, "Pr(>|z|)"][2]
+serum_sodium_p_value
+```
+
+```{r}
+# Double-check if serum sodium is a significant predictor by computing CI
+serum_sodium_coefficient <- coef(serum_sodium_model)
+serum_sodium_coefficient
+# Get confidence intervals for coefficients
+serum_sodium_conf_intervals <- confint(serum_sodium_model)
+serum_sodium_conf_intervals
+
+```
+
+```{r}
+likelihood_ss <- function(parameters, data) {
+  log_odds_ss <- parameters[1] + parameters[2] * data$serum_sodium
+  probabilities <- 1 / (1 + exp(-log_odds_ss))
+  log_likelihood_ss <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_ss)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_ss, data = heart_data)
+
+mle_ss_parameters <- result$par
+cat("MLE Parameters:", mle_ss_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+serum_sodium_values <- seq(min(heart_data$serum_sodium), max(heart_data$serum_sodium), length.out = 50)
+log_odds <- serum_sodium_coefficient * serum_sodium_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$serum_sodium, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "serum_sodium", ylab = "Death Event", main = "Logistic Regression Curve for serum_sodium")
+lines(serum_sodium_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Sex
+ggplot(heart_data, aes(x = sex, fill = as.factor(DEATH_EVENT))) +
+  geom_bar() +
+  xlab("Sex") +
+  ylab("Count") +
+  ggtitle("Heart Disease Female vs Male") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Survive", "Death"))
+```
+
+```{r}
+sex <- "sex"
+
+formula_sex <- as.formula(paste("DEATH_EVENT ~", sex))
+
+# Sex model
+sex_model <- glm(formula_sex, data = heart_data, family = "binomial")
+
+# Check significance
+sex_summary <- summary(sex_model)
+sex_summary
+# Extract p-value
+sex_p_value <- sex_summary$coefficients[, "Pr(>|z|)"][2]
+sex_p_value
+```
+
+```{r}
+# Double-check if sex is a significant predictor by computing CI
+sex_coefficient <- coef(sex_model)
+sex_coefficient
+# Get confidence intervals for coefficients
+sex_conf_intervals <- confint(sex_model)
+sex_conf_intervals
+
+```
+
+```{r}
+likelihood_sex <- function(parameters, data) {
+  log_odds_sex <- parameters[1] + parameters[2] * data$sex
+  probabilities <- 1 / (1 + exp(-log_odds_sex))
+  log_likelihood_sex <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_sex)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_sex, data = heart_data)
+
+mle_sex_parameters <- result$par
+cat("MLE Parameters:", mle_sex_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+sex_values <- seq(min(heart_data$sex), max(heart_data$sex), length.out = 50)
+log_odds <- sex_coefficient * sex_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$sex, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "sex", ylab = "Death Event", main = "Logistic Regression Curve for sex")
+lines(sex_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+# Smoking
+ggplot(heart_data, aes(x = smoking, fill = as.factor(DEATH_EVENT))) +
+  geom_bar(position = "dodge", color = "black", alpha = 0.7) +
+  xlab("Smoking") +
+  ylab("Count") +
+  ggtitle("Smoking vs. Death Event") +
+  scale_fill_discrete(name = "Death Event", labels = c("Survive", "Death"))
+```
+
+```{r}
+smoking <- "smoking"
+
+formula_smoking <- as.formula(paste("DEATH_EVENT ~", smoking))
+
+# Smoking model
+smoking_model <- glm(formula_smoking, data = heart_data, family = "binomial")
+
+# Check significance
+smoking_summary <- summary(smoking_model)
+smoking_summary
+# Extract p-value
+smoking_p_value <- smoking_summary$coefficients[, "Pr(>|z|)"][2]
+smoking_p_value
+```
+
+```{r}
+# Double-check if smoking is a significant predictor by computing CI
+smoking_coefficient <- coef(smoking_model)
+smoking_coefficient
+# Get confidence intervals for coefficients
+smoking_conf_intervals <- confint(smoking_model)
+smoking_conf_intervals
+
+```
+
+```{r}
+likelihood_smoking <- function(parameters, data) {
+  log_odds_smoking <- parameters[1] + parameters[2] * data$smoking
+  probabilities <- 1 / (1 + exp(-log_odds_smoking))
+  log_likelihood_smoking <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood_smoking)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+initial_parameters <- c(0, 0)
+
+result <- optim(par = initial_parameters, fn = likelihood_smoking, data = heart_data)
+
+mle_smoking_parameters <- result$par
+cat("MLE Parameters:", mle_smoking_parameters, "\n")
+```
+
+```{r}
+# Plot to visualize the significance of the predictor
+smoking_values <- seq(min(heart_data$smoking), max(heart_data$smoking), length.out = 50)
+log_odds <- smoking_coefficient * smoking_values  # Adjust this line based on your model coefficients
+
+# Sigmoid function to convert log-odds to probabilities
+probability <- 1 / (1 + exp(-log_odds))
+
+# Plotting
+plot(heart_data$smoking, heart_data$DEATH_EVENT, pch = 16, col = "blue", xlab = "smoking", ylab = "Death Event", main = "Logistic Regression Curve for smoking")
+lines(smoking_values, probability, col = "red", lwd = 2)
+
+# Adding a horizontal line at y = 0.5 (decision boundary)
+abline(h = 0.5, col = "green", lty = 2)
+
+# Adding legend
+legend("topright", legend = c("Data", "Logistic Curve", "Decision Boundary"), col = c("blue", "red", "green"), lty = c(NA, 1, 2), pch = c(16, NA, NA))
+```
+
+```{r}
+alpha <- 0.05
+
+predictors <- c(age, anemia, creatinine_phosphokinase, diabetes,
+                ejection_fraction, hbp, platelets, serum_creatinine, 
+                serum_sodium, sex, smoking)
+
+p_values <- c(age_p_value, anemia_p_value, creatinine_p_value, diabetes_p_value,
+              ejection_fraction_p_value, hbp_p_value, platelets_p_value,
+              serum_creatinine_p_value, serum_sodium_p_value, sex_p_value,
+              smoking_p_value)
+
+
+if (any(p_values < alpha)) {
+  significant_predictors <- predictors[p_values < alpha]
+  
+  cat("Significant predictors:", paste(significant_predictors, collapse = ", "), "\n")
+  cat("Corresponding p-values:", paste(p_values[p_values < alpha], collapse = ", "), "\n\n")
+
+} 
+
+if (any(p_values > alpha)){
+    non_significant_predictors <- predictors[p_values > alpha]
+    
+    cat("Non-significant predictors:", paste(non_significant_predictors, collapse = ", "), "\n")
+    cat("Corresponding p-values:", paste(p_values[p_values > alpha], collapse = ", "), "\n")
+}
+```
+
+```{r}
+# All model
+all_model_formula <- as.formula(paste("DEATH_EVENT ~", paste(predictors, collapse = " + ")))
+
+all_model <- glm(all_model_formula, data = heart_data, family = "binomial")
+
+# Check significance
+all_summary <- summary(all_model)
+all_summary
+```
+```{r}
+# Check if there are significant predictors by computing CI
+coefficients <- coef(all_model)
+
+# Get confidence intervals for coefficients
+conf_intervals <- confint(all_model)
+
+# Display the results
+results <- data.frame(coefficients, conf_intervals)
+print(results)
+```
+
+```{r}
+# Create a likelihood function with multiple predictors
+likelihood <- function(parameters, data) {
+  log_odds <- parameters[1] + sum(parameters[2:length(parameters)] * data[, 2:ncol(data)])
+  probabilities <- 1 / (1 + exp(-log_odds))
+  log_likelihood <- sum(data$DEATH_EVENT * log(probabilities) + (1 - data$DEATH_EVENT) * log(1 - probabilities))
+  return(-log_likelihood)  # We want to maximize, so we minimize the negative log likelihood
+}
+
+# Initial guess for parameters (include one for intercept and one for each predictor)
+initial_parameters <- rep(0, ncol(heart_data)-2)
+
+# Optimize the likelihood function
+result <- optim(par = initial_parameters, fn = likelihood, data = heart_data)
+
+# Extract the MLE parameters
+mle_parameters <- result$par
+cat("MLE Parameters:", mle_parameters, "\n")
+
+```
+
+```{r}
+library(effects)
+effect_all <- allEffects(all_model)
+plot(effect_all, col = "red", lines = TRUE, rug = FALSE)
+```
+
+```{r}
+# Significant model
+significant_model_formula <- as.formula(paste("DEATH_EVENT ~", paste(significant_predictors, collapse = " + ")))
+
+significant_model <- glm(significant_model_formula, data = heart_data, family = "binomial")
+
+# Check significance
+significant_summary <- summary(significant_model)
+significant_summary
+```
+
+```{r}
+# Double-check if the significant predictors are significant by computing CI
+significant_coefficient <- coef(significant_model)
+significant_coefficient
+# Get confidence intervals for coefficients
+significant_conf_intervals <- confint(significant_model)
+significant_conf_intervals
+```
+
+```{r}
+effect_sign <- allEffects(significant_model)
+plot(effect_sign, col = "red", lines = TRUE, rug = FALSE)
+```
+
+```{r}
+# Correlation matrix between predictors to check for multicollinearity
+corr_matrix <- cor(heart_data[predictors])
+corr_matrix
+
+corrplot(corr_matrix, method = "color")
+```
+
+```{r}
+# Alternative way to check for multicollinearity
+
+vif_values <- car::vif(all_model)
+vif_values
+
+# NO values between 5-10, no collinearity
+```
+
+```{r}
+# Create a model with all predictors except smoking since it has the highest p-value
+not_smoking_model <- glm(formula = DEATH_EVENT ~ age + anaemia + creatinine_phosphokinase
+                         + diabetes + ejection_fraction + high_blood_pressure + platelets + serum_creatinine
+                         + serum_sodium + sex, data = heart_data, family = "binomial")
+
+# Check significance
+not_smoking_summary <- summary(not_smoking_model)
+not_smoking_summary
+
+# Little increase in deviance, anova test not to lose info
+not_smoking_anova <- anova(all_model, not_smoking_model, test = "Chisq")
+not_smoking_anova
+```
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except platelets since it has the highest p-value
+not_platelets_model <- glm(formula = DEATH_EVENT ~ age + anaemia + creatinine_phosphokinase
+                         + diabetes + ejection_fraction + high_blood_pressure + serum_creatinine
+                         + serum_sodium + sex, data = heart_data, family = "binomial")
+
+# Check significance
+not_platelets_summary <- summary(not_platelets_model)
+not_platelets_summary
+
+# Little increase in deviance, anova test not to lose info
+not_platelets_anova <- anova(all_model, not_platelets_model, test = "Chisq")
+not_platelets_anova
+```
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except diabetes since it has the highest p-value
+not_diabetes_model <- glm(formula = DEATH_EVENT ~ age + anaemia + creatinine_phosphokinase
+                         + ejection_fraction + high_blood_pressure + serum_creatinine
+                         + serum_sodium + sex, data = heart_data, family = "binomial")
+
+# Check significance
+not_diabetes_summary <- summary(not_diabetes_model)
+not_diabetes_summary
+
+# Little increase in deviance, anova test not to lose info
+not_diabetes_anova <- anova(all_model, not_diabetes_model, test = "Chisq")
+not_diabetes_anova
+```
+
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except sex since it has the highest p-value
+not_sex_model <- glm(formula = DEATH_EVENT ~ age + anaemia + creatinine_phosphokinase
+                         + ejection_fraction + high_blood_pressure + serum_creatinine
+                         + serum_sodium, data = heart_data, family = "binomial")
+
+# Check significance
+not_sex_summary <- summary(not_sex_model)
+not_sex_summary
+
+# Little increase in deviance, anova test not to lose info
+not_sex_anova <- anova(all_model, not_sex_model, test = "Chisq")
+not_sex_anova
+```
+
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except anemia since it has the highest p-value
+not_anemia_model <- glm(formula = DEATH_EVENT ~ age + creatinine_phosphokinase
+                         + ejection_fraction + high_blood_pressure + serum_creatinine
+                         + serum_sodium, data = heart_data, family = "binomial")
+
+# Check significance
+not_anemia_summary <- summary(not_anemia_model)
+not_anemia_summary
+
+# Little increase in deviance, anova test not to lose info
+not_anemia_anova <- anova(all_model, not_anemia_model, test = "Chisq")
+not_anemia_anova
+```
+
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except serum_sodium since it has the highest p-value
+not_serum_sodium_model <- glm(formula = DEATH_EVENT ~ age + creatinine_phosphokinase
+                         + ejection_fraction + high_blood_pressure + serum_creatinine, 
+                         data = heart_data, family = "binomial")
+
+# Check significance
+not_serum_sodium_summary <- summary(not_serum_sodium_model)
+not_serum_sodium_summary
+
+# Little increase in deviance, anova test not to lose info
+not_serum_sodium_anova <- anova(all_model, not_serum_sodium_model, test = "Chisq")
+not_serum_sodium_anova
+```
+
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except creatinine since it has the highest p-value
+not_creatinine_model <- glm(formula = DEATH_EVENT ~ age + ejection_fraction 
+                        + high_blood_pressure + serum_creatinine, 
+                        data = heart_data, family = "binomial")
+# Check significance
+not_creatinine_summary <- summary(not_creatinine_model)
+not_creatinine_summary
+
+# Little increase in deviance, anova test not to lose info
+not_creatinine_anova <- anova(all_model, not_creatinine_model, test = "Chisq")
+not_creatinine_anova
+```
+
+```{r}
+# We have not lost info, p-value non-significant
+# Create a model with all predictors except hbp since it has the highest p-value
+not_hbp_model <- glm(formula = DEATH_EVENT ~ age + ejection_fraction + serum_creatinine, 
+                        data = heart_data, family = "binomial")
+# Check significance
+not_hbp_summary <- summary(not_hbp_model)
+not_hbp_summary
+
+# Little increase in deviance, anova test not to lose info
+not_hbp_anova <- anova(all_model, not_hbp_model, test = "Chisq")
+not_hbp_anova
+```
+
+```{r}
+# Compute probabilities for the final model
+final_model <- not_hbp_model
+summary(final_model)
+
+heart_data$prob_pred <- predict(final_model, newdata = heart_data, type = "response")
+
+heart_data$prediction <- cut(heart_data$prob_pred, breaks = c(0, 0.5, 1), labels = c(0, 1))
+attach(heart_data)
+table(heart_data$DEATH_EVENT, heart_data$prediction)
+```
+
+```{r}
+# Compare probabilities with the all model
+final_model <- all_model
+summary(final_model)
+
+heart_data$prob_pred <- predict(final_model, newdata = heart_data, type = "response")
+
+heart_data$prediction <- cut(heart_data$prob_pred, breaks = c(0, 0.5, 1), labels = c(0, 1))
+attach(heart_data)
+table(heart_data$DEATH_EVENT, heart_data$prediction)
+
+# Exactly the same numbers, the final model is correct
+```
